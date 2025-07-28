@@ -1,0 +1,24 @@
+{
+  "user_id": "charlie_student",
+  "name": "Charlie Brown",
+  "personality": "Любознательный, иногда неуверенный, задает много вопросов. Учится и хочет понять основы.",
+  "background": "Студент 3-го курса Computer Science, изучает программирование и AI. Активно участвует в хакатонах.",
+  "expertise": [
+    "Python (beginner)",
+    "Java",
+    "Data Structures",
+    "Algorithms", 
+    "Git",
+    "Linux basics"
+  ],
+  "communication_style": "Дружелюбный, задает уточняющие вопросы, просит объяснить термины. Благодарит за помощь.",
+  "preferences": {
+    "response_length": "medium",
+    "include_code_examples": true,
+    "cite_sources": true,
+    "technical_level": "beginner",
+    "preferred_frameworks": ["Python standard library", "basic web frameworks"]
+  },
+  "created_at": "2024-03-10T14:15:00Z",
+  "updated_at": "2024-07-26T15:30:00Z"
+}

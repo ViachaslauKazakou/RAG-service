@@ -1,0 +1,71 @@
+{
+    "workbench.colorCustomizations": {
+        "editorError.foreground": "#ffef0f",
+        "editorWarning.foreground": "#3777ff",
+        "activityBar.background": "#392C02",
+        "titleBar.activeBackground": "#503E03",
+        "titleBar.activeForeground": "#FEFAED"
+    },
+    "python.defaultInterpreterPath": "./.venv/bin/python",
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestPath": "./.venv/bin/pytest",
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        ".mypy_cache": true
+    },
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit",
+    
+    },
+    "editor.renderControlCharacters": true,
+    // "editor.cursorBlinking": "smooth",
+    // "editor.cursorStyle": "line",
+    "editor.fontSize": 14,
+    "editor.lineHeight": 19,
+    "postman.settings.dotenv-detection-notification-visibility": false,
+    // "editor.suggestSelection": "first",
+    // "editor.snippetSuggestions": "top",
+    // "editor.parameterHints.enabled": true,
+    // "editor.codeLens": true,
+
+    "flake8.enabled" : true,
+    "editor.formatOnType": true,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": false,
+    "editor.wordWrap": "on",
+    "editor.minimap.enabled": false,
+    // "editor.renderWhitespace": "boundary",
+    "editor.cursorBlinking": "smooth",
+    "editor.cursorStyle": "line",
+    "editor.suggestSelection": "first",
+    "editor.snippetSuggestions": "top",
+    "editor.parameterHints.enabled": true,
+    "editor.codeLens": true,
+    // "editor.gotoLocation.multiple": "peek",
+    "editor.hover.enabled": true,
+    "editor.linkedEditing": true,
+    "editor.unicodeHighlight.ambiguousCharacters": false,
+    "editor.unicodeHighlight.invisibleCharacters": false,
+    "editor.unicodeHighlight.nonBasicASCII": false,
+    "editor.unicodeHighlight.allowedCharacters": {},
+    "python.languageServer": "Pylance",
+    "python.analysis.typeCheckingMode": "off",
+
+    // Добавьте эти настройки для увеличения шрифта
+    "chat.editor.fontSize": 13,
+    "chat.editor.lineHeight": 16,
+    "workbench.tree.indent": 18,
+    "workbench.tree.renderIndentGuides": "always",
+    "terminal.integrated.fontSize": 12,
+    "debug.console.fontSize": 12,
+    "markdown.preview.fontSize": 12,
+    
+    // Для увеличения шрифта в табах и других элементах интерфейса
+    "window.zoomLevel": 0.5,
+    
+    // Альтернативно, для более точного контроля:
+    "editor.accessibilitySupport": "auto"
+}

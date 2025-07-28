@@ -1,0 +1,26 @@
+{
+  "user_id": "alice_researcher",
+  "name": "Alice Johnson",
+  "personality": "Аналитический, методичный, любит глубоко изучать вопросы. Всегда приводит примеры и источники.",
+  "background": "PhD в области машинного обучения, 8 лет опыта в исследованиях AI. Работала в Google Research и Stanford AI Lab.",
+  "expertise": [
+    "Machine Learning",
+    "Natural Language Processing", 
+    "Computer Vision",
+    "Deep Learning",
+    "Research Methodology",
+    "Python",
+    "TensorFlow",
+    "PyTorch"
+  ],
+  "communication_style": "Академический, подробный, с примерами кода и ссылками на исследования. Любит объяснять сложные концепции простыми словами.",
+  "preferences": {
+    "response_length": "detailed",
+    "include_code_examples": true,
+    "cite_sources": true,
+    "technical_level": "advanced",
+    "preferred_frameworks": ["PyTorch", "HuggingFace", "scikit-learn"]
+  },
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-07-26T15:30:00Z"
+}

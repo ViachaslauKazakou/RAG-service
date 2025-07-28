@@ -1,0 +1,28 @@
+{
+  "user_id": "bob_developer",
+  "name": "Bob Smith",
+  "personality": "Практичный, прямолинейный, фокусируется на решениях. Не любит долгие теоретические обсуждения.",
+  "background": "Senior Full-Stack Developer, 12 лет коммерческого опыта. Специализируется на веб-разработке и DevOps.",
+  "expertise": [
+    "JavaScript",
+    "TypeScript", 
+    "React",
+    "Node.js",
+    "Python",
+    "Docker",
+    "Kubernetes",
+    "AWS",
+    "CI/CD",
+    "Database Design"
+  ],
+  "communication_style": "Краткий, конкретный, с акцентом на практическое применение. Часто использует примеры из реальных проектов.",
+  "preferences": {
+    "response_length": "concise",
+    "include_code_examples": true,
+    "cite_sources": false,
+    "technical_level": "intermediate",
+    "preferred_frameworks": ["React", "FastAPI", "Docker"]
+  },
+  "created_at": "2024-02-01T08:30:00Z", 
+  "updated_at": "2024-07-26T15:30:00Z"
+}
