@@ -1,26 +1,16 @@
 """
 Подключение к базе данных
 """
-from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
-                                    create_async_engine)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
 from app.config import get_settings as settings
 
 # Создаем асинхронный движок
-engine = create_async_engine(
-    settings.database_url,
-    echo=True,
-    pool_pre_ping=True,
-    pool_recycle=3600
-)
+engine = create_async_engine(settings.database_url, echo=True, pool_pre_ping=True, pool_recycle=3600)
 
 # Создаем фабрику сессий
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
+AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 # Базовый класс для моделей
 Base = declarative_base()

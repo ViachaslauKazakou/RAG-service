@@ -16,14 +16,14 @@ logger = logging.getLogger(__name__)
 async def test_alaev_loading():
     """Тестирует загрузку данных для alaev"""
     service = KnowledgeService()
-    
+
     # Получаем сессию БД
     db_gen = get_db()
     db = await anext(db_gen)
-    
+
     try:
         print("=== Тестирование загрузки для alaev (user_id=1) ===")
-        
+
         # 1. Загружаем знания из JSON
         print("\n1. Загружаем знания из JSON файла...")
         knowledge = await service._load_from_json_file("alaev")
@@ -34,7 +34,7 @@ async def test_alaev_loading():
         else:
             print("❌ Не удалось загрузить знания")
             return
-        
+
         # 2. Сохраняем знания в БД с character_id
         print("\n2. Сохраняем знания в БД...")
         try:
@@ -44,7 +44,7 @@ async def test_alaev_loading():
         except Exception as e:
             print(f"❌ Ошибка сохранения знаний: {e}")
             await db.rollback()
-        
+
         # 3. Проверяем что знания сохранились
         print("\n3. Проверяем сохраненные знания...")
         saved_knowledge = await service.load_user_knowledge(1, db)
@@ -52,19 +52,19 @@ async def test_alaev_loading():
             print(f"✅ Знания найдены в БД: {saved_knowledge.name}")
         else:
             print("❌ Знания не найдены в БД")
-        
+
         # 4. Загружаем примеры сообщений
         print("\n4. Загружаем примеры сообщений...")
         message_count = await service.load_message_examples_from_json("alaev", db)
         print(f"✅ Загружено {message_count} примеров сообщений")
-        
+
         # 5. Проверяем количество сообщений в БД
         print("\n5. Проверяем сообщения в БД...")
         total_messages = await service.get_message_examples_count(None, db)
         user_messages = await service.get_message_examples_count(1, db)
         print(f"✅ Всего сообщений в БД: {total_messages}")
         print(f"✅ Сообщений для user_id=1: {user_messages}")
-        
+
     finally:
         await db.close()
 

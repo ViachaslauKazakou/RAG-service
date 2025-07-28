@@ -5,7 +5,7 @@ import os
 import sys
 
 # Добавляем путь к app в Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'app'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
 # Настройки для тестирования
 os.environ["TESTING"] = "true"

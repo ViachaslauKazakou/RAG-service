@@ -82,7 +82,7 @@ class User(Base):
 
 
 class UsersContext(Base):
-    __tablename__ = 'users_base_context'
+    __tablename__ = "users_base_context"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     # user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=True)

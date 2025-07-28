@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 class RAGRequest(BaseModel):
     """Запрос для обработки RAG"""
+
     topic: str = Field(..., description="Топик обсуждения")
     user_id: int = Field(..., description="ID пользователя от имени которого ответ")
     question: str = Field(..., description="Вопрос для обработки")
@@ -23,6 +24,7 @@ class ContextItem(BaseModel):
     """
     Элемент контекста
     """
+
     content: str = Field(..., description="Содержимое контекста")
     source: str = Field(..., description="Источник контекста")
     similarity_score: float = Field(..., description="Оценка схожести")
@@ -31,6 +33,7 @@ class ContextItem(BaseModel):
 
 class RAGResponse(BaseModel):
     """Ответ от RAG системы"""
+
     enhanced_prompt: str = Field(..., description="Сгенерированный промпт")
     context_items: List[ContextItem] = Field(..., description="Найденные элементы контекста")
     user_persona: Dict[str, Any] = Field(..., description="Персона пользователя")
@@ -40,6 +43,7 @@ class RAGResponse(BaseModel):
 
 class UserKnowledge(BaseModel):
     """Знания пользователя"""
+
     user_id: int  # Теперь integer - ID реального пользователя
     character_id: Optional[str] = None  # Строковый идентификатор персонажа
     name: str
@@ -53,15 +57,14 @@ class UserKnowledge(BaseModel):
 
 class LoadKnowledgeRequest(BaseModel):
     """Запрос на загрузку знаний пользователя"""
+
     user_id: int = Field(..., description="ID пользователя")
-    user_kb_profile: str = Field(
-        ...,
-        description="Профиль пользователя с его знаниями и предпочтениями"
-    )
+    user_kb_profile: str = Field(..., description="Профиль пользователя с его знаниями и предпочтениями")
 
 
 class LoadKnowledgeResponse(BaseModel):
     """Ответ на загрузку знаний"""
+
     success: bool = Field(..., description="Успешно ли выполнена загрузка")
     user_id: Optional[int] = Field(None, description="ID созданного/найденного пользователя")
     character_id: str = Field(..., description="Строковый идентификатор персонажа")
@@ -71,11 +74,13 @@ class LoadKnowledgeResponse(BaseModel):
 
 class LoadMessagesRequest(BaseModel):
     """Запрос на загрузку примеров сообщений"""
+
     character_id: str = Field(..., description="Строковый идентификатор персонажа")
 
 
 class LoadMessagesResponse(BaseModel):
     """Ответ на загрузку примеров сообщений"""
+
     success: bool = Field(..., description="Успешно ли выполнена загрузка")
     character_id: str = Field(..., description="Строковый идентификатор персонажа")
     loaded_count: int = Field(..., description="Количество загруженных сообщений")
@@ -84,11 +89,13 @@ class LoadMessagesResponse(BaseModel):
 
 class LoadAllDataRequest(BaseModel):
     """Запрос на загрузку всех данных для персонажа"""
+
     character_id: str = Field(..., description="Строковый идентификатор персонажа")
 
 
 class LoadAllDataResponse(BaseModel):
     """Ответ на загрузку всех данных"""
+
     success: bool = Field(..., description="Успешно ли выполнена загрузка")
     user_id: Optional[int] = Field(None, description="ID пользователя")
     character_id: str = Field(..., description="Строковый идентификатор персонажа")
@@ -100,12 +107,14 @@ class LoadAllDataResponse(BaseModel):
 
 class UserListResponse(BaseModel):
     """Список доступных пользователей"""
+
     users: List[Dict[str, Any]] = Field(..., description="Список пользователей")
     total_count: int = Field(..., description="Общее количество пользователей")
 
 
 class ContextDocument(BaseModel):
     """Контекстный документ из векторной БД"""
+
     id: int
     content: str
     similarity_score: float
@@ -116,6 +125,7 @@ class ContextDocument(BaseModel):
 
 class UserMessageExample(BaseModel):
     """Пример сообщения пользователя"""
+
     id: Optional[int] = None
     user_id: int  # Теперь integer - ID реального пользователя
     character_id: Optional[str] = None  # Строковый идентификатор персонажа
@@ -131,6 +141,7 @@ class UserMessageExample(BaseModel):
 
 class MessageContextRequest(BaseModel):
     """Запрос на создание контекста для ответа"""
+
     user_id: str = Field(..., description="ID пользователя который отвечает")
     topic_id: int = Field(..., description="ID топика")
     parent_message_id: Optional[int] = Field(None, description="ID сообщения на которое отвечаем")
@@ -141,6 +152,7 @@ class MessageContextRequest(BaseModel):
 
 class MessageContextResponse(BaseModel):
     """Ответ с контекстом для генерации сообщения"""
+
     user_knowledge: UserKnowledge = Field(..., description="Профиль пользователя")
     similar_examples: List[UserMessageExample] = Field(..., description="Похожие примеры сообщений")
     context_prompt: str = Field(..., description="Сгенерированный промпт")
@@ -149,6 +161,7 @@ class MessageContextResponse(BaseModel):
 
 class LoadExamplesRequest(BaseModel):
     """Запрос на загрузку примеров из JSON файлов"""
+
     user_id: str = Field(..., description="ID пользователя")
     force_reload: bool = Field(False, description="Принудительная перезагрузка")
     timestamp: datetime
@@ -163,6 +176,7 @@ class LoadExamplesRequest(BaseModel):
 
 class UserMessageExampleCreate(BaseModel):
     """Схема для создания примера сообщения"""
+
     user_knowledge_id: uuid.UUID
     topic_id: Optional[int] = None
     context: Optional[str] = None
@@ -175,6 +189,7 @@ class UserMessageExampleCreate(BaseModel):
 
 class UserMessageExampleUpdate(BaseModel):
     """Схема для обновления примера сообщения"""
+
     context: Optional[str] = None
     content: Optional[str] = None
     reply_to: Optional[str] = None
@@ -183,6 +198,7 @@ class UserMessageExampleUpdate(BaseModel):
 
 class SimilaritySearchRequest(BaseModel):
     """Запрос поиска похожих сообщений"""
+
     query: str = Field(..., description="Текст для поиска")
     user_knowledge_id: Optional[uuid.UUID] = Field(None, description="ID пользователя для фильтрации")
     topic_id: Optional[int] = Field(None, description="ID топика для фильтрации")
@@ -192,6 +208,7 @@ class SimilaritySearchRequest(BaseModel):
 
 class SimilaritySearchResponse(BaseModel):
     """Результат поиска похожих сообщений"""
+
     examples: List[UserMessageExample]
     query_embedding_time: float
     search_time: float
@@ -200,6 +217,7 @@ class SimilaritySearchResponse(BaseModel):
 
 class HealthStatus(BaseModel):
     """Статус здоровья сервиса"""
+
     status: str
     timestamp: datetime
     database_status: str
@@ -210,6 +228,7 @@ class HealthStatus(BaseModel):
 
 class UserMessageExample(BaseModel):
     """Пример сообщения пользователя"""
+
     id: Optional[int] = None
     user_id: str
     character: str
@@ -231,6 +250,7 @@ class UserMessageExample(BaseModel):
 
 class MessageSearchRequest(BaseModel):
     """Запрос поиска подходящих сообщений"""
+
     user_id: str
     query: str
     context: Optional[str] = None
@@ -241,6 +261,7 @@ class MessageSearchRequest(BaseModel):
 
 class MessageSearchResponse(BaseModel):
     """Ответ поиска сообщений"""
+
     user_id: str
     query: str
     examples: List[UserMessageExample]
@@ -249,6 +270,7 @@ class MessageSearchResponse(BaseModel):
 
 
 ####################
+
 
 class Status(str, PyEnum):
     pending = "pending"
