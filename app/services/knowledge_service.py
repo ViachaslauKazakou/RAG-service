@@ -3,19 +3,18 @@
 """
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
 
 from app.config import get_settings
-from app.imported_models import Message, Topic, User
-from app.models import UserKnowledgeRecord, UserMessageExample
-from app.schemas import UserKnowledge
+from shared_models.models import UserKnowledgeRecord, UserMessageExample, User
+from app.schemas import UserKnowledge, UserMessageExampleSSchema
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +25,23 @@ class KnowledgeService:
     def __init__(self):
         self.knowledge_base_path = Path(get_settings.knowledge_base_path)
         self._cache = {}  # Простой кэш в памяти
+        # Импортируем локально, чтобы избежать циклических зависимостей
+        self._vector_service = None
+        self._rag_service = None
+
+    def _get_vector_service(self):
+        """Ленивая инициализация VectorService"""
+        if self._vector_service is None:
+            from app.services.vector_service import VectorService
+            self._vector_service = VectorService()
+        return self._vector_service
+
+    def _get_rag_service(self):
+        """Ленивая инициализация RAGService"""
+        if self._rag_service is None:
+            from app.services.rag_service import RAGService
+            self._rag_service = RAGService()
+        return self._rag_service
 
     async def load_user_knowledge(self, user_id: int, db: AsyncSession) -> Optional[UserKnowledge]:
         """
@@ -211,36 +227,16 @@ class KnowledgeService:
                 logger.error(f"Failed to load knowledge from JSON for {character_id}")
                 return False
 
-            # Проверяем, есть ли уже пользователь в таблице users по JSON user_id
-            json_user_id = knowledge.user_id
+            # Проверяем, есть ли уже пользователь в таблице users по user_id
+            # json_user_id = knowledge.user_id
 
-            result = await db.execute(text("SELECT id FROM users WHERE id = :user_id"), {"user_id": json_user_id})
-            existing_user = result.fetchone()
+            result = await db.execute(select(User.id).where(User.id == user_id))
+            existing_user = result.scalar_one_or_none()
 
-            if existing_user:
-                user_id = existing_user[0]
-                logger.info(f"Found existing user with ID: {user_id}")
-            else:
-                # Создаем нового пользователя
-                result = await db.execute(
-                    text(
-                        """
-                        INSERT INTO users (username, email, firstname, password, status, user_type) 
-                        VALUES (:username, :email, :firstname, :password, :status, :user_type)
-                        RETURNING id
-                    """
-                    ),
-                    {
-                        "username": character_id,
-                        "email": f"{character_id}@forum.local",
-                        "firstname": knowledge.name,
-                        "password": "dummy_password",  # Заглушка
-                        "status": "active",
-                        "user_type": "user",
-                    },
-                )
-                user_id = result.scalar_one()
-                logger.info(f"Created new user: {character_id} with ID: {user_id}")
+            if not existing_user:
+                raise HTTPException(status_code=404, detail="User not found")
+            user_id = existing_user
+            logger.info(f"Found existing user with ID: {user_id}")
 
             # Устанавливаем правильные значения для сохранения
             knowledge.user_id = user_id
@@ -402,7 +398,7 @@ class KnowledgeService:
 
 ТВОИ ПРЕДПОЧТЕНИЯ:
 - Длина ответа: {user_knowledge.preferences.get('response_length', 'medium')}
-- Включать примеры кода: {user_knowledge.preferences.get('include_code_examples', False)}
+- Включать примеры кода: {user_knowledge.preferences.get('include_code_examples', True)}
 - Ссылаться на источники: {user_knowledge.preferences.get('cite_sources', False)}
 - Технический уровень: {user_knowledge.preferences.get('technical_level', 'intermediate')}
 
@@ -420,34 +416,17 @@ class KnowledgeService:
 
         return prompt.strip()
 
-    async def get_user_by_character_id(self, user_id: str, db: AsyncSession) -> Optional[int]:
-        """
-        Получает user_id по character_id
-
-        Args:
-            character_id: Строковый идентификатор персонажа
-            db: Сессия базы данных
-
-        Returns:
-            user_id или None
-        """
-        logger.info(f"Finding user by character_id: {user_id}")
-        if not user_id:
-            logger.warning("Character ID is empty, cannot find user")
-            return None
-        try:
-            result = await db.execute(select(UserKnowledgeRecord.user_id).where(UserKnowledgeRecord.user_id == user_id))
-            user_id = result.scalar_one_or_none()
-            return user_id
-        except Exception as e:
-            logger.error(f"Error finding user by character_id {character_id}: {e}")
-            return None
-
-    async def load_message_examples_from_json(self, character_id: str, db: AsyncSession) -> int:
+    async def upload_message_examples_from_json(
+        self,
+        user_id: int,
+        character_id: str,
+        db: AsyncSession,
+    ) -> int:
         """
         Загружает примеры сообщений пользователя из JSON файла в базу данных
 
         Args:
+            user_id: Числовой идентификатор пользователя
             character_id: Строковый идентификатор пользователя (например, 'alice_researcher')
             db: Сессия базы данных
 
@@ -459,12 +438,7 @@ class KnowledgeService:
         if not file_path.exists():
             logger.info(f"Message examples file not found: {file_path}")
             return 0
-
-        # Получаем integer user_id по character_id
-        user_id = await self.get_user_by_character_id(character_id, db)
-        if not user_id:
-            logger.warning(f"User not found for character_id: {character_id}")
-            return 0
+        logger.info(f"Loading message examples from {file_path} for user {user_id} (character: {character_id})")
 
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -498,13 +472,13 @@ class KnowledgeService:
 
                 # Создаем новую запись
                 message_example = UserMessageExample(
-                    user_id=user_id,
+                    user_id=int(user_id),  # Приводим к integer
                     character_id=character_id,  # Сохраняем character_id
                     context=msg.get("context", ""),
                     content=msg.get("content", ""),
                     thread_id=msg.get("thread_id", ""),
                     reply_to=msg.get("reply_to"),
-                    timestamp=datetime.now(),  # Используем текущее время
+                    created_at=datetime.now(),  # Используем текущее время
                     extra_metadata={
                         "character_type": msg.get("character_type"),
                         "mood": msg.get("mood"),
@@ -517,13 +491,45 @@ class KnowledgeService:
                 db.add(message_example)
                 loaded_count += 1
 
+            # Сохраняем все сообщения в базу данных сначала
             await db.commit()
+            
+            # Теперь создаем эмбеддинги для добавленных сообщений
+            await self._create_embeddings_for_messages(user_id, character_id, db)
+            
             logger.info(f"Loaded {loaded_count} message examples for character {character_id} (user_id: {user_id})")
             return loaded_count
 
         except Exception as e:
             logger.error(f"Error loading message examples from {file_path}: {e}")
             await db.rollback()
+            return 0
+
+    async def load_message_examples_from_json(self, character_id: str, db: AsyncSession) -> int:
+        """
+        Загружает примеры сообщений для указанного персонажа
+        Это обертка для upload_message_examples_from_json, которая определяет user_id
+
+        Args:
+            character_id: Строковый идентификатор персонажа
+            db: Сессия базы данных
+
+        Returns:
+            Количество загруженных сообщений
+        """
+        try:
+            # Находим user_id по character_id
+            user_id = await self.get_user_by_character_id(character_id, db)
+            
+            if not user_id:
+                logger.warning(f"User not found for character_id: {character_id}")
+                return 0
+
+            # Вызываем основной метод загрузки
+            return await self.upload_message_examples_from_json(user_id, character_id, db)
+
+        except Exception as e:
+            logger.error(f"Error loading message examples for character {character_id}: {e}")
             return 0
 
     async def load_all_message_examples(self, db: AsyncSession) -> Dict[str, int]:
@@ -557,6 +563,73 @@ class KnowledgeService:
         logger.info(f"Message loading completed. Total loaded: {total_loaded} messages for {len(results)} users")
 
         return results
+    
+    async def upload_message_examples(
+        self,
+        request: List[UserMessageExampleSSchema],
+        db: AsyncSession,
+    ) -> int:
+        """
+        Загружает примеры сообщений пользователя из JSON файла в базу данных
+
+        Args:
+            user_id: Числовой идентификатор пользователя
+            character_id: Строковый идентификатор пользователя (например, 'alice_researcher')
+            db: Сессия базы данных
+
+        Returns:
+            Количество загруженных сообщений
+        """
+        loaded_count = 0
+
+        try:
+            for msg in request:
+                # Проверяем, не существует ли уже такое сообщение
+                # Используем комбинацию user_id и content для уникальности (убираем timestamp из-за проблем с типами)
+                existing_result = await db.execute(
+                    select(UserMessageExample).where(
+                        UserMessageExample.user_id == msg.user_id, UserMessageExample.content == msg.content
+                    )
+                )
+
+                if existing_result.scalar_one_or_none():
+                    logger.debug(f"Message already exists for {msg.user_id}, skipping")
+                    continue
+
+                # Создаем новую запись
+                message_example = UserMessageExample(
+                    user_id=int(msg.user_id),  # Приводим к integer
+                    character_id=msg.character_id,  # Сохраняем character_id
+                    context=msg.context,
+                    content=msg.content,
+                    thread_id=msg.topic_id,
+                    reply_to=msg.reply_to,
+                    created_at=datetime.now(),  # Используем текущее время
+                    extra_metadata={
+                        "character_type": "",
+                        "mood": "",
+                        "based_on": "",
+                        "original_timestamp": "",  # Сохраняем оригинальный timestamp в метаданных
+                    },
+                    source_file="directly uploaded",  # Указываем, что файл загружен напрямую
+                )
+
+                db.add(message_example)
+                loaded_count += 1
+
+                # Сохраняем все сообщения в базу данных сначала
+                await db.commit()
+                
+                # Теперь создаем эмбеддинги для добавленных сообщений
+                await self._create_embeddings_for_messages(msg.user_id, msg.character_id, db)
+
+                logger.info(f"Loaded {loaded_count} message examples for character {msg.character_id} (user_id: {msg.user_id})")
+                return loaded_count
+
+        except Exception as e:
+            logger.error(f"Error loading message examples: {e}")
+            await db.rollback()
+            return 0
 
     async def get_message_examples_count(self, user_id: Optional[int], db: AsyncSession) -> int:
         """
@@ -685,3 +758,74 @@ class KnowledgeService:
             result["message"] = error_msg
 
         return result
+
+    async def _create_embeddings_for_messages(self, user_id: int, character_id: str, db: AsyncSession):
+        """
+        Создает эмбеддинги для сообщений пользователя, которые еще не имеют эмбеддингов
+
+        Args:
+            user_id: ID пользователя
+            character_id: Строковый идентификатор персонажа
+            db: Сессия базы данных
+        """
+        try:
+            # Получаем все сообщения пользователя, которые не имеют эмбеддингов
+            messages_result = await db.execute(
+                select(UserMessageExample).where(
+                    UserMessageExample.user_id == user_id,
+                    UserMessageExample.content_embedding.is_(None)
+                )
+            )
+            messages = messages_result.scalars().all()
+
+            if not messages:
+                logger.info(f"No messages without embeddings found for user {user_id}")
+                return
+
+            logger.info(f"Creating embeddings for {len(messages)} messages for character {character_id}")
+
+            rag_service = self._get_rag_service()
+
+            # Подготавливаем списки текстов для пакетной обработки
+            content_texts = []
+            context_texts = []
+            messages_with_context = []
+            
+            for message in messages:
+                content_texts.append(message.content)
+                if message.context and message.context.strip():
+                    context_texts.append(message.context)
+                    messages_with_context.append(len(context_texts) - 1)  # Индекс в context_texts
+                else:
+                    messages_with_context.append(-1)  # Нет контекста
+
+            # Получаем эмбеддинги пакетом для эффективности
+            logger.debug(f"Getting batch embeddings for {len(content_texts)} contents and {len(context_texts)} contexts")
+            
+            content_embeddings = await rag_service.get_batch_embeddings(content_texts)
+            context_embeddings = []
+            if context_texts:
+                context_embeddings = await rag_service.get_batch_embeddings(context_texts)
+
+            # Применяем эмбеддинги к сообщениям
+            for i, message in enumerate(messages):
+                try:
+                    # Устанавливаем эмбеддинг контента
+                    if i < len(content_embeddings):
+                        message.content_embedding = content_embeddings[i]
+
+                    # Устанавливаем эмбеддинг контекста если есть
+                    context_index = messages_with_context[i]
+                    if context_index >= 0 and context_index < len(context_embeddings):
+                        message.context_embedding = context_embeddings[context_index]
+
+                except Exception as e:
+                    logger.error(f"Error creating embedding for message {message.id}: {e}")
+                    continue
+
+            await db.commit()
+            logger.info(f"Successfully created embeddings for {len(messages)} messages for character {character_id}")
+
+        except Exception as e:
+            logger.error(f"Error creating embeddings for user {user_id} messages: {e}")
+            await db.rollback()

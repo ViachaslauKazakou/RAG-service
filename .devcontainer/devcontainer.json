@@ -1,0 +1,66 @@
+{
+    "name": "RAG Service Dev Container",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "app",
+    "workspaceFolder": "/app",
+    // Настройки VS Code
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.debugpy",
+                "ms-python.black-formatter",
+                "ms-python.isort",
+                "ms-python.pylint",
+                "bradlc.vscode-tailwindcss",
+                "ms-vscode.vscode-json"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.linting.enabled": true,
+                "python.linting.pylintEnabled": true,
+                "python.formatting.provider": "black",
+                "python.sortImports.args": [
+                    "--profile",
+                    "black"
+                ],
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.organizeImports": "explicit"
+                }
+            }
+        }
+    },
+    // Порты для отладки
+    "forwardPorts": [
+        8001,
+        5433,
+        11434
+    ],
+    "portsAttributes": {
+        "8001": {
+            "label": "RAG Service API",
+            "onAutoForward": "notify"
+        },
+        "5433": {
+            "label": "PostgreSQL",
+            "onAutoForward": "silent"
+        },
+        "11434": {
+            "label": "Ollama",
+            "onAutoForward": "silent"
+        }
+    },
+    // Команды после создания контейнера
+    "postCreateCommand": "pip install debugpy",
+    // Переменные окружения для разработки
+    "containerEnv": {
+        "PYTHONPATH": "/app",
+        "ENVIRONMENT": "development"
+    },
+    // Монтирование для сохранения данных между перезапусками
+    "mounts": [
+        "source=${localWorkspaceFolder}/.vscode,target=/app/.vscode,type=bind",
+        "source=rag-service-venv,target=/usr/local/lib/python3.12/site-packages,type=volume"
+    ]
+}

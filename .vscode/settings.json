@@ -17,7 +17,6 @@
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
         "source.organizeImports": "explicit",
-    
     },
     "editor.renderControlCharacters": true,
     // "editor.cursorBlinking": "smooth",
@@ -29,8 +28,7 @@
     // "editor.snippetSuggestions": "top",
     // "editor.parameterHints.enabled": true,
     // "editor.codeLens": true,
-
-    "flake8.enabled" : true,
+    "flake8.enabled": true,
     "flake8.args": [
         "--max-line-length=120",
         "--ignore=E501,W503,E203"
@@ -57,7 +55,10 @@
     "editor.unicodeHighlight.allowedCharacters": {},
     "python.languageServer": "Pylance",
     "python.analysis.typeCheckingMode": "off",
-
+    // Docker debugging settings
+    "python.debug.redirectOutput": true,
+    "python.debug.showReturnValue": true,
+    "python.debug.internalConsoleOptions": "openOnSessionStart",
     // Добавьте эти настройки для увеличения шрифта
     "chat.editor.fontSize": 13,
     "chat.editor.lineHeight": 16,
@@ -66,10 +67,8 @@
     "terminal.integrated.fontSize": 12,
     "debug.console.fontSize": 12,
     "markdown.preview.fontSize": 12,
-    
     // Для увеличения шрифта в табах и других элементах интерфейса
     "window.zoomLevel": 0.5,
-    
     // Альтернативно, для более точного контроля:
     "editor.accessibilitySupport": "auto"
 }

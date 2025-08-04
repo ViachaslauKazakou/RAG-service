@@ -24,6 +24,8 @@ from app.schemas import (
     RAGResponse,
     UserKnowledge,
     UserListResponse,
+    UserMessageExample,
+    UserMessageExampleSSchema,
 )
 from app.services.knowledge_service import KnowledgeService
 from app.services.rag_service import RAGService
@@ -323,8 +325,8 @@ async def load_user_knowledge(request: LoadKnowledgeRequest, db: AsyncSession = 
         )
 
 
-@router.post("/data/load-messages-json", response_model=LoadMessagesResponse)
-async def load_user_messages(request: LoadMessagesRequest, db: AsyncSession = Depends(get_db)):
+@router.post("/data/upload-messages-json", response_model=LoadMessagesResponse)
+async def load_user_messages_json(request: LoadMessagesRequest, db: AsyncSession = Depends(get_db)):
     """
     Загружает примеры сообщений пользователя из JSON файла
 
@@ -338,7 +340,7 @@ async def load_user_messages(request: LoadMessagesRequest, db: AsyncSession = De
     try:
         logger.info(f"Loading messages for character: {request.character_id}")
 
-        loaded_count = await knowledge_service.load_message_examples_from_json(request.character_id, db)
+        loaded_count = await knowledge_service.upload_message_examples_from_json(request.user_id, request.character_id, db)
 
         return LoadMessagesResponse(
             success=loaded_count > 0,
@@ -353,6 +355,36 @@ async def load_user_messages(request: LoadMessagesRequest, db: AsyncSession = De
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error loading messages: {str(e)}"
         )
 
+
+@router.post("/data/upload-message-examples", response_model=LoadMessagesResponse)
+async def load_user_messages_example(request: list[UserMessageExampleSSchema], db: AsyncSession = Depends(get_db)):
+    """
+    Загружает примеры сообщений пользователя из формы
+
+    Args:
+        request: list[UserMessageExampleSSchema]
+        db: Сессия базы данных
+
+    Returns:
+        Результат загрузки сообщений
+    """
+    try:
+        logger.info(f"Loading messages for user: {request[0].user_id}, character: {request[0].character_id}")
+
+        loaded_count = await knowledge_service.upload_message_examples(request, db)
+
+        return LoadMessagesResponse(
+            success=loaded_count > 0,
+            character_id=request[0].character_id,
+            loaded_count=loaded_count,
+            message=f"Successfully loaded {loaded_count} messages for {request[0].character_id}",
+        )
+
+    except Exception as e:
+        logger.error(f"Error loading messages for {request.character_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error loading messages: {str(e)}"
+        )
 
 @router.post("/data/load-all", response_model=LoadAllDataResponse)
 async def load_all_user_data(request: LoadAllDataRequest, db: AsyncSession = Depends(get_db)):

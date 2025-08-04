@@ -17,7 +17,7 @@ class RAGRequest(BaseModel):
     question: str = Field(..., description="Вопрос для обработки")
     reply_to: Optional[str] = Field(None, description="ID пользователя, кому ответ")
     context_limit: Optional[int] = Field(10, description="Лимит контекстных документов")
-    similarity_threshold: Optional[float] = Field(0.7, description="Порог схожести для поиска")
+    similarity_threshold: Optional[float] = Field(0.5, description="Порог схожести для поиска")
 
 
 class ContextItem(BaseModel):
@@ -26,19 +26,21 @@ class ContextItem(BaseModel):
     """
 
     content: str = Field(..., description="Содержимое контекста")
-    source: str = Field(..., description="Источник контекста")
+    source: Optional[str] = Field(None, description="Источник контекста")
     similarity_score: float = Field(..., description="Оценка схожести")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Дополнительные метаданные")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Дополнительные метаданные")
 
 
 class RAGResponse(BaseModel):
     """Ответ от RAG системы"""
 
-    enhanced_prompt: str = Field(..., description="Сгенерированный промпт")
-    context_items: List[ContextItem] = Field(..., description="Найденные элементы контекста")
-    user_persona: Dict[str, Any] = Field(..., description="Персона пользователя")
-    processing_time: float = Field(..., description="Время обработки в секундах")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Время обработки")
+    generated_prompt: str = Field(..., description="Сгенерированный промпт")
+    user_id: int = Field(..., description="ID пользователя от имени которого ответ")
+    topic: str = Field(..., description="Топик обсуждения")
+    context_documents: List[ContextItem] = Field(..., description="Контекстные документы")
+    user_knowledge: Dict[str, Any] = Field(..., description="Знания пользователя")
+    confidence_score: float = Field(..., description="Оценка уверенности в ответе")
+    processing_time: float = Field(..., description="Время обработки запроса в секундах")
 
 
 class UserKnowledge(BaseModel):
@@ -73,9 +75,10 @@ class LoadKnowledgeResponse(BaseModel):
 
 
 class LoadMessagesRequest(BaseModel):
-    """Запрос на загрузку примеров сообщений"""
+    """Запрос на загрузку примеров сообщений в БД"""
 
     character_id: str = Field(..., description="Строковый идентификатор персонажа")
+    user_id: int = Field(..., description="Числовой идентификатор пользователя в базе данных")
 
 
 class LoadMessagesResponse(BaseModel):
@@ -123,18 +126,18 @@ class ContextDocument(BaseModel):
     message_id: Optional[int] = None
 
 
-class UserMessageExample(BaseModel):
+class UserMessageExampleSSchema(BaseModel):
     """Пример сообщения пользователя"""
 
-    id: Optional[int] = None
+    # id: Optional[int] = None
     user_id: int  # Теперь integer - ID реального пользователя
     character_id: Optional[str] = None  # Строковый идентификатор персонажа
-    topic_id: Optional[int] = None
+    topic_id: Optional[str] = None
     parent_message_id: Optional[int] = None
     context: Optional[str] = None
     content: str
     reply_to: Optional[str] = None
-    timestamp: datetime
+    # timestamp: datetime
     source_file: Optional[str] = None
     extra_metadata: Optional[Dict[str, Any]] = None
 
@@ -154,7 +157,7 @@ class MessageContextResponse(BaseModel):
     """Ответ с контекстом для генерации сообщения"""
 
     user_knowledge: UserKnowledge = Field(..., description="Профиль пользователя")
-    similar_examples: List[UserMessageExample] = Field(..., description="Похожие примеры сообщений")
+    similar_examples: List[UserMessageExampleSSchema] = Field(..., description="Похожие примеры сообщений")
     context_prompt: str = Field(..., description="Сгенерированный промпт")
     processing_time: float = Field(..., description="Время обработки")
 
@@ -209,7 +212,7 @@ class SimilaritySearchRequest(BaseModel):
 class SimilaritySearchResponse(BaseModel):
     """Результат поиска похожих сообщений"""
 
-    examples: List[UserMessageExample]
+    examples: List[UserMessageExampleSSchema]
     query_embedding_time: float
     search_time: float
     total_results: int

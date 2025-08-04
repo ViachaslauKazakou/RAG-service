@@ -5,10 +5,10 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import text
+from sqlalchemy import text, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Embedding, MessageEmbedding
+from shared_models.models import Embedding, MessageEmbedding, UserMessageExample
 from app.schemas import ContextDocument
 
 logger = logging.getLogger(__name__)
@@ -24,9 +24,9 @@ class VectorService:
         self,
         query_embedding: List[float],
         db: AsyncSession,
-        topic: Optional[str] = None,
+        user_id: Optional[int] = None,
         limit: int = 10,
-        similarity_threshold: float = 0.7,
+        similarity_threshold: float = 0.1,
     ) -> List[ContextDocument]:
         """
         Поиск похожих сообщений в векторной базе
@@ -34,7 +34,7 @@ class VectorService:
         Args:
             query_embedding: Вектор запроса
             db: Сессия базы данных
-            topic: Топик для фильтрации (опционально)
+            user_id: ID пользователя для фильтрации (опционально)
             limit: Максимальное количество результатов
             similarity_threshold: Порог схожести
 
@@ -42,57 +42,33 @@ class VectorService:
             Список найденных документов
         """
         try:
-            # Формируем запрос с фильтрацией по топику если нужно
-            if topic:
-                query = text(
-                    """
-                    SELECT 
-                        id, 
-                        message_id,
-                        topic_id,
-                        content, 
-                        1 - (embedding <=> :query_embedding::vector) as similarity,
-                        metadata
-                    FROM message_embeddings
-                    WHERE 
-                        1 - (embedding <=> :query_embedding::vector) > :similarity_threshold
-                        AND (metadata->>'topic' = :topic OR :topic IS NULL)
-                    ORDER BY embedding <=> :query_embedding::vector
-                    LIMIT :limit
-                """
-                )
+            # Создаем базовый запрос к user_message_examples
+            base_query = select(
+                UserMessageExample.id,
+                UserMessageExample.user_id,
+                UserMessageExample.content,
+                UserMessageExample.context,
+                UserMessageExample.extra_metadata,
+                (1 - UserMessageExample.content_embedding.cosine_distance(query_embedding)).label('similarity')
+            ).where(
+                UserMessageExample.content_embedding.is_not(None)
+            )
+            
+            # Применяем фильтры
+            base_query = base_query.where(
+                (1 - UserMessageExample.content_embedding.cosine_distance(query_embedding)) > similarity_threshold
+            )
+            
+            # Фильтр по пользователю если указан
+            if user_id:
+                base_query = base_query.where(UserMessageExample.user_id == user_id)
+            
+            # Сортировка по схожести и ограничение
+            base_query = base_query.order_by(
+                UserMessageExample.content_embedding.cosine_distance(query_embedding)
+            ).limit(limit)
 
-                result = await db.execute(
-                    query,
-                    {
-                        "query_embedding": query_embedding,
-                        "similarity_threshold": similarity_threshold,
-                        "topic": topic,
-                        "limit": limit,
-                    },
-                )
-            else:
-                query = text(
-                    """
-                    SELECT 
-                        id, 
-                        message_id,
-                        topic_id,
-                        content, 
-                        1 - (embedding <=> :query_embedding::vector) as similarity,
-                        metadata
-                    FROM message_embeddings
-                    WHERE 1 - (embedding <=> :query_embedding::vector) > :similarity_threshold
-                    ORDER BY embedding <=> :query_embedding::vector
-                    LIMIT :limit
-                """
-                )
-
-                result = await db.execute(
-                    query,
-                    {"query_embedding": query_embedding, "similarity_threshold": similarity_threshold, "limit": limit},
-                )
-
+            result = await db.execute(base_query)
             rows = result.fetchall()
 
             documents = []
@@ -101,13 +77,13 @@ class VectorService:
                     id=row.id,
                     content=row.content,
                     similarity_score=float(row.similarity),
-                    metadata=row.metadata or {},
-                    topic_id=row.topic_id,
-                    message_id=row.message_id,
+                    metadata=row.extra_metadata or {},
+                    topic_id=None,  # В user_message_examples нет topic_id
+                    message_id=None,  # В user_message_examples нет message_id
                 )
                 documents.append(doc)
 
-            logger.info(f"Found {len(documents)} similar messages for topic '{topic}'")
+            logger.info(f"Found {len(documents)} similar messages for user_id '{user_id}'")
             return documents
 
         except Exception as e:
@@ -115,7 +91,7 @@ class VectorService:
             return []
 
     async def search_general_embeddings(
-        self, query_embedding: List[float], db: AsyncSession, limit: int = 5, similarity_threshold: float = 0.7
+        self, query_embedding: List[float], db: AsyncSession, limit: int = 5, similarity_threshold: float = 0.08
     ) -> List[ContextDocument]:
         """
         Поиск в общих эмбеддингах
@@ -130,31 +106,28 @@ class VectorService:
             Список найденных документов
         """
         try:
-            query = text(
-                """
-                SELECT 
-                    id, 
-                    content, 
-                    1 - (embedding <=> :query_embedding::vector) as similarity,
-                    metadata
-                FROM embeddings
-                WHERE 1 - (embedding <=> :query_embedding::vector) > :similarity_threshold
-                ORDER BY embedding <=> :query_embedding::vector
-                LIMIT :limit
-            """
-            )
+            # Создаем запрос для общих эмбеддингов
+            query = select(
+                Embedding.id,
+                Embedding.content,
+                Embedding.extra_metadata,
+                (1 - Embedding.embedding.cosine_distance(query_embedding)).label('similarity')
+            ).where(
+                (1 - Embedding.embedding.cosine_distance(query_embedding)) > similarity_threshold
+            ).order_by(
+                Embedding.embedding.cosine_distance(query_embedding)
+            ).limit(limit)
 
-            result = await db.execute(
-                query,
-                {"query_embedding": query_embedding, "similarity_threshold": similarity_threshold, "limit": limit},
-            )
-
+            result = await db.execute(query)
             rows = result.fetchall()
 
             documents = []
             for row in rows:
                 doc = ContextDocument(
-                    id=row.id, content=row.content, similarity_score=float(row.similarity), metadata=row.metadata or {}
+                    id=row.id, 
+                    content=row.content, 
+                    similarity_score=float(row.similarity), 
+                    metadata=row.extra_metadata or {}
                 )
                 documents.append(doc)
 

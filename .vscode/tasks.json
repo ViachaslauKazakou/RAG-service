@@ -1,23 +1,99 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"label": "Запустить форум-приложение",
-			"type": "shell",
-			"command": "/Users/slava/Work/AI-forum/.venv/bin/python",
-			"args": [
-				"-m",
-				"uvicorn",
-				"app.main:app",
-				"--host",
-				"0.0.0.0",
-				"--port",
-				"8000",
-				"--reload"
-			],
-			"group": "build",
-			"isBackground": true,
-			"problemMatcher": []
-		}
-	]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Запустить форум-приложение",
+            "type": "shell",
+            "command": "/Users/slava/Work/AI-forum/.venv/bin/python",
+            "args": [
+                "-m",
+                "uvicorn",
+                "app.main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--reload"
+            ],
+            "group": "build",
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Docker: Build Dev Container",
+            "type": "shell",
+            "command": "docker-compose",
+            "args": [
+                "-f",
+                "docker-compose.dev.yml",
+                "build"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Docker: Start Dev Container with Debug",
+            "type": "shell",
+            "command": "docker-compose",
+            "args": [
+                "-f",
+                "docker-compose.dev.yml",
+                "up",
+                "-d"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "dependsOn": "Docker: Build Dev Container"
+        },
+        {
+            "label": "Docker: Stop Dev Container",
+            "type": "shell",
+            "command": "docker-compose",
+            "args": [
+                "-f",
+                "docker-compose.dev.yml",
+                "down"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Docker: View Dev Logs",
+            "type": "shell",
+            "command": "docker-compose",
+            "args": [
+                "-f",
+                "docker-compose.dev.yml",
+                "logs",
+                "-f",
+                "rag_service"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        }
+    ]
 }

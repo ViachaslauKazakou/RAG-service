@@ -1,0 +1,55 @@
+# Dockerfile для разработки RAG Service
+FROM python:3.12-bullseye
+
+# Устанавливаем системные зависимости
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    make \
+    curl \
+    git \
+    postgresql-client \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Копируем файлы зависимостей (сгенерированы локально)
+COPY requirements.txt requirements-hf.txt requirements-dev.txt ./
+
+# Устанавливаем зависимости
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-hf.txt && \
+    pip install --no-cache-dir -r requirements-dev.txt && \
+    pip install --no-cache-dir debugpy
+
+# Создаем пользователя приложения
+RUN useradd --create-home --shell /bin/bash app_user
+
+# Копируем код приложения
+COPY app/ ./app/
+COPY forum_knowledge_base/ ./forum_knowledge_base/
+COPY alembic.ini ./
+COPY migrate.py ./
+
+# Создаем директории и устанавливаем права
+RUN mkdir -p /app/logs /tmp/hf_cache && \
+    chown -R app_user:app_user /app && \
+    chown -R app_user:app_user /tmp/hf_cache
+
+# Переключаемся на пользователя приложения
+USER app_user
+
+# Переменные окружения для разработки
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    POSTGRES_URL=postgresql+asyncpg://docker:docker@postgres:5432/postgres \
+    AI_MANAGER_URL=http://ai_manager:8080 \
+    ENV=development
+
+# Открываем порт
+EXPOSE 8000 5678
+
+# Команда запуска для разработки с отладкой
+CMD ["python", "-Xfrozen_modules=off", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

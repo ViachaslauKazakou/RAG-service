@@ -1,0 +1,41 @@
+# Docker Compose для разработки
+services:
+  
+  rag_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: rag_service_dev
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://docker:docker@host.docker.internal:5433/postgres
+      - AI_MANAGER_URL=http://localhost:8002
+      - LOG_LEVEL=debug
+      - PYTHONPATH=/app
+      - ENV=development
+      - SKIP_DB_INIT=true
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - PYDEVD_DISABLE_FILE_VALIDATION=1
+    ports:
+      - "8001:8000"  # FastAPI
+      - "5678:5678"  # Debug port
+    volumes:
+      # Монтируем код для hot reload
+      - ./app:/app/app
+      - ./forum_knowledge_base:/app/forum_knowledge_base
+      - ./logs:/app/logs
+    networks:
+      - ai_network
+
+    command: ["python", "-Xfrozen_modules=off", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    restart: unless-stopped
+
+volumes:
+  ollama_models:
+    driver: local
+
+networks:
+  ai_network:
+    driver: bridge
+    # ipam:
+    #   config:
+    #     - subnet: 172.22.0.0/16

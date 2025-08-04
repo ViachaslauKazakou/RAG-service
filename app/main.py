@@ -1,7 +1,6 @@
 """
 Основное FastAPI приложение для RAG менеджера
 """
-import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -31,14 +30,17 @@ async def lifespan(app: FastAPI):
     logger.info("Starting RAG Manager service...")
 
     try:
-        # Инициализация БД
-        logger.info("Initializing database...")
-        await init_db()
+        # Инициализация БД (можно пропустить в dev режиме)
+        if settings.skip_db_init:
+            logger.info("Skipping database initialization (SKIP_DB_INIT=true)")
+        else:
+            logger.info("Initializing database...")
+            await init_db()
 
         # Инициализация кэша знаний
-        logger.info("Initializing knowledge cache...")
-        knowledge_service = KnowledgeService()
-        await knowledge_service.warm_cache()
+        # logger.info("Initializing knowledge cache...")
+        # knowledge_service = KnowledgeService()
+        # await knowledge_service.warm_cache()
 
         logger.info("RAG Manager service started successfully")
 
@@ -115,7 +117,7 @@ async def root():
     return {
         "service": "RAG Manager",
         "version": "1.0.0",
-        "status": "running",
+        "status": "running (dev mode)",
         "docs": "/docs",
         "health": "/api/v1/health",
     }
