@@ -9,7 +9,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import router
+from app.api.default import router
+from app.api.openai import router as openai_router
 from app.config import get_settings
 from app.database import init_db
 from app.services.knowledge_service import KnowledgeService
@@ -106,6 +107,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Подключение роутов
 app.include_router(router, prefix="/api/v1")
+app.include_router(openai_router)
 
 
 # Корневой endpoint

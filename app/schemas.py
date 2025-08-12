@@ -12,10 +12,10 @@ from pydantic import BaseModel, Field
 class RAGRequest(BaseModel):
     """Запрос для обработки RAG"""
 
-    topic: str = Field(..., description="Топик обсуждения")
+    topic: int = Field(..., description="Топик обсуждения")
     user_id: int = Field(..., description="ID пользователя от имени которого ответ")
     question: str = Field(..., description="Вопрос для обработки")
-    reply_to: Optional[str] = Field(None, description="ID пользователя, кому ответ")
+    reply_to: Optional[int] = Field(None, description="ID пользователя, кому ответ")
     context_limit: Optional[int] = Field(10, description="Лимит контекстных документов")
     similarity_threshold: Optional[float] = Field(0.5, description="Порог схожести для поиска")
 

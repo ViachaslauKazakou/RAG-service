@@ -1,7 +1,7 @@
 # Docker Compose для разработки
 services:
   
-  rag_service:
+  rag_service_dev:
     build:
       context: .
       dockerfile: Dockerfile.dev

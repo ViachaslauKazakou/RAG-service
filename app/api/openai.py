@@ -33,7 +33,7 @@ from app.services.vector_service import VectorService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1/openai", tags=["OpenAI"])
 
 # Глобальные сервисы
 rag_service = RAGService()
@@ -45,7 +45,7 @@ startup_time = time.time()
 
 
 @router.post("/rag/process", response_model=RAGResponse)
-async def process_rag_request(request: RAGRequest, db: AsyncSession = Depends(get_db)):
+async def process_rag_request(request: RAGRequest,  db: AsyncSession = Depends(get_db), rag_type: str = "openai"):
     """
     Обрабатывает RAG запрос
 
@@ -59,7 +59,7 @@ async def process_rag_request(request: RAGRequest, db: AsyncSession = Depends(ge
     try:
         logger.info(f"Processing RAG request for user {request.user_id}, topic: {request.topic}")
 
-        response = await rag_service.process_rag_request(request, db)
+        response = await rag_service.process_rag_request(request, db, rag_type=rag_type)
 
         logger.info(f"RAG request processed successfully in {response.processing_time:.3f}s")
         return response

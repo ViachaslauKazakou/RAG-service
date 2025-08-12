@@ -36,7 +36,7 @@ class RAGService:
         if self._http_client:
             await self._http_client.aclose()
 
-    async def process_rag_request(self, request: RAGRequest, db: AsyncSession) -> RAGResponse:
+    async def process_rag_request(self, request: RAGRequest, db: AsyncSession, rag_type: str = "default") -> RAGResponse:
         """
         Обрабатывает RAG запрос
 
@@ -72,9 +72,11 @@ class RAGService:
 
             # 4. Создаем промпт
             generated_prompt = await self.knowledge_service.create_character_prompt(
+                rag_type=rag_type,
                 user_knowledge=user_knowledge,
                 question=request.question,
-                context_docs=[doc.model_dump()for doc in context_documents],
+                topic=request.topic,
+                context_docs=[doc.model_dump() for doc in context_documents],
                 reply_to=request.reply_to,
             )
 

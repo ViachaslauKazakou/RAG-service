@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
+from shared_models import Topic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
@@ -175,6 +176,52 @@ class KnowledgeService:
         except Exception as e:
             logger.error(f"Error saving to database: {e}")
             raise
+        
+    async def get_username_by_user_id(self, user_id: int, db: AsyncSession) -> Optional[str]:
+        """
+        Получает имя пользователя по user_id
+
+        Args:
+            user_id: ID пользователя
+            db: Сессия базы данных
+
+        Returns:
+            Имя пользователя или None
+        """
+        try:
+            result = await db.execute(select(User.name).where(User.id == user_id))
+            row = result.fetchone()
+            if row:
+                return row[0]
+            else:
+                logger.warning(f"No user found with ID: {user_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error fetching username for user_id {user_id}: {e}")
+            return None
+        
+    async def get_topic_title_by_topic_id(self, topic_id: int, db: AsyncSession) -> Optional[str]:
+        """
+        Получает название темы по topic_id
+
+        Args:
+            topic_id: ID темы
+            db: Сессия базы данных
+
+        Returns:
+            Название темы или None
+        """
+        try:
+            result = await db.execute(select(Topic.title).where(Topic.id == topic_id))
+            row = result.fetchone()
+            if row:
+                return row[0]
+            else:
+                logger.warning(f"No topic found with ID: {topic_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error fetching topic title for topic_id {topic_id}: {e}")
+            return None
 
     async def get_user_by_character_id(self, character_id: str, db: AsyncSession) -> Optional[int]:
         """
@@ -351,13 +398,106 @@ class KnowledgeService:
 
     async def create_character_prompt(
         self,
+        rag_type: str,
         user_knowledge: UserKnowledge,
         question: str,
         context_docs: List[Dict[str, Any]],
         reply_to: Optional[str] = None,
+        topic: Optional[int] = None,
     ) -> str:
         """
         Создает промпт для генерации ответа от имени пользователя
+
+        Args:
+            user_knowledge: Знания пользователя
+            question: Вопрос
+            context_docs: Контекстные документы
+            reply_to: Кому адресован ответ
+
+        Returns:
+            Сгенерированный промпт
+        """
+        topic = self.get_topic_title_by_topic_id(int(topic)) if topic else None
+        reply_to = self.get_username_by_user_id(int(reply_to), db=None) if reply_to else None
+        logger.info(f"Creating character prompt for rag_type: {rag_type}, user_id: {user_knowledge.user_id}, topic: {topic}")
+        if rag_type == "default":
+            return await self._default_prompt(user_knowledge, question, context_docs, reply_to, topic)
+        elif rag_type == "openai":
+            return await self._openai_prompt(user_knowledge, question, context_docs, reply_to, topic)
+
+    async def _default_prompt(
+        self, 
+        user_knowledge: UserKnowledge, 
+        question: str, 
+        context_docs: List[Dict[str, Any]], 
+        reply_to: Optional[str] = None,
+        topic: Optional[str] = None
+    ) -> str:
+        
+        # Формируем контекст из найденных документов
+        context_text = "\n\n".join(
+            [
+                f"Документ {i+1} (similarity: {doc.get('similarity_score', 0):.3f}):\n{doc.get('content', '')}"
+                for i, doc in enumerate(context_docs[:5])  # Берем топ-5
+            ]
+        )
+
+        # Формируем информацию о целевом пользователе
+        reply_context = ""
+        if reply_to:
+            reply_context = f"\n\nТы отвечаешь пользователю: {reply_to}"
+
+        # Создаем промпт
+        prompt = f"""Ты - {user_knowledge.name} ({user_knowledge.user_id}).
+
+            # ТВОЯ ЛИЧНОСТЬ И ХАРАКТЕР:
+            {user_knowledge.personality}
+
+            # ТВОЙ БЭКГРАУНД:
+            {user_knowledge.background}
+
+            # ТВОЯ ЭКСПЕРТИЗА:
+            {', '.join(user_knowledge.expertise)}
+
+            # ТВОЙ СТИЛЬ ОБЩЕНИЯ:
+            {user_knowledge.communication_style}
+
+            # ТВОИ ПРЕДПОЧТЕНИЯ:
+            - Длина ответа: {user_knowledge.preferences.get('response_length', 'medium')}
+            - Включать примеры кода: {user_knowledge.preferences.get('include_code_examples', True)}
+            - Ссылаться на источники: {user_knowledge.preferences.get('cite_sources', False)}
+            - Технический уровень: {user_knowledge.preferences.get('technical_level', 'intermediate')}
+
+            # РЕЛЕВАНТНЫЙ КОНТЕКСТ ИЗ ПРЕДЫДУЩИХ ОБСУЖДЕНИЙ:
+            {context_text if context_text.strip() else "Контекст не найден - отвечай на основе своих знаний."}
+
+            # ВОПРОС:
+            {question}{reply_context}
+
+            # ТЕМА ОБСУЖДЕНИЯ:
+            {topic if topic else "Тема не указана."}
+            
+            # ТЫ ОТВЕЧАЕШЬ ПОЛЬЗОВАТЕЛЮ:
+              {reply_to}
+
+            # ИНСТРУКЦИЯ:
+            Ответь на вопрос как {user_knowledge.name}, используя свою личность, стиль общения и экспертизу. 
+            Опирайся на предоставленный контекст, но если он недостаточен, используй свои знания в области твоей экспертизы.
+            Сохраняй характерный для тебя стиль и манеру изложения.
+            """
+
+        return prompt.strip()
+    
+    async def _openai_prompt(
+        self,
+        user_knowledge: UserKnowledge,
+        question: str,
+        context_docs: List[Dict[str, Any]],
+        reply_to: Optional[str] = None,
+        topic: Optional[str] = None,
+    ) -> str:
+        """
+        Создает промпт для OpenAI Knowledge Base
 
         Args:
             user_knowledge: Знания пользователя
@@ -383,37 +523,39 @@ class KnowledgeService:
 
         # Создаем промпт
         prompt = f"""Ты - {user_knowledge.name} ({user_knowledge.user_id}).
+            # ТВОЯ ЛИЧНОСТЬ И ХАРАКТЕР:
+            Ты - {user_knowledge.name} 
+            {user_knowledge.personality}
 
-ТВОЯ ЛИЧНОСТЬ И ХАРАКТЕР:
-{user_knowledge.personality}
+            # ТВОЙ БЭКГРАУНД:
+            {user_knowledge.background}
 
-ТВОЙ БЭКГРАУНД:
-{user_knowledge.background}
+            # ТВОЯ ЭКСПЕРТИЗА:
+            {', '.join(user_knowledge.expertise)}
 
-ТВОЯ ЭКСПЕРТИЗА:
-{', '.join(user_knowledge.expertise)}
+            # ТВОЙ СТИЛЬ ОБЩЕНИЯ:
+            {user_knowledge.communication_style}
 
-ТВОЙ СТИЛЬ ОБЩЕНИЯ:
-{user_knowledge.communication_style}
+            # ТВОИ ПРЕДПОЧТЕНИЯ:
+            - Длина ответа: {user_knowledge.preferences.get('response_length', 'medium')}
+            - Включать примеры кода: {user_knowledge.preferences.get('include_code_examples', True)}
+            - Ссылаться на источники: {user_knowledge.preferences.get('cite_sources', False)}
+            - Технический уровень: {user_knowledge.preferences.get('technical_level', 'intermediate')}
 
-ТВОИ ПРЕДПОЧТЕНИЯ:
-- Длина ответа: {user_knowledge.preferences.get('response_length', 'medium')}
-- Включать примеры кода: {user_knowledge.preferences.get('include_code_examples', True)}
-- Ссылаться на источники: {user_knowledge.preferences.get('cite_sources', False)}
-- Технический уровень: {user_knowledge.preferences.get('technical_level', 'intermediate')}
+            # РЕЛЕВАНТНЫЙ КОНТЕКСТ ИЗ ПРЕДЫДУЩИХ ОБСУЖДЕНИЙ:
+            {context_text if context_text.strip() else "Контекст не найден - отвечай на основе своих знаний."}
 
-РЕЛЕВАНТНЫЙ КОНТЕКСТ ИЗ ПРЕДЫДУЩИХ ОБСУЖДЕНИЙ:
-{context_text if context_text.strip() else "Контекст не найден - отвечай на основе своих знаний."}
+            # ВОПРОС/СООБЩЕНИЕ:
+            {question}{reply_context}
+            
+            # ТЕМА ОБСУЖДЕНИЯ:
+            {topic if topic else "Тема не указана."}
 
-ВОПРОС:
-{question}{reply_context}
-
-ИНСТРУКЦИЯ:
-Ответь на вопрос как {user_knowledge.name}, используя свою личность, стиль общения и экспертизу. 
-Опирайся на предоставленный контекст, но если он недостаточен, используй свои знания в области твоей экспертизы.
-Сохраняй характерный для тебя стиль и манеру изложения.
-"""
-
+            # ИНСТРУКЦИЯ:
+            Ответь на вопрос или прокомментируй сообщение как {user_knowledge.name}, используя свою личность, стиль общения и экспертизу. 
+            Опирайся на предоставленный контекст, но если он недостаточен, используй свои знания в области твоей экспертизы.
+            Сохраняй характерный для тебя стиль и манеру изложения.
+            """
         return prompt.strip()
 
     async def upload_message_examples_from_json(

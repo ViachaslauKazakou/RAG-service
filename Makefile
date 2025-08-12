@@ -24,8 +24,7 @@ build-dev: export-deps ## Собрать Docker образы для разраб
 up: ## Запустить все сервисы
 	docker-compose -f $(COMPOSE_FILE) up -d
 	@echo "Сервисы запущены:"
-	@echo "- RAG Service: http://localhost:8000"
-	@echo "- PostgreSQL: localhost:5433"
+	@echo "- RAG Service: http://localhost:8001"
 
 up-dev: ## Запустить сервисы для разработки
 	docker-compose -f $(DEV_COMPOSE_FILE) up -d
