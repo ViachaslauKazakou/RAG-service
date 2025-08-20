@@ -189,7 +189,7 @@ class KnowledgeService:
             Имя пользователя или None
         """
         try:
-            result = await db.execute(select(User.name).where(User.id == user_id))
+            result = await db.execute(select(User.username).where(User.id == user_id))
             row = result.fetchone()
             if row:
                 return row[0]
@@ -398,6 +398,7 @@ class KnowledgeService:
 
     async def create_character_prompt(
         self,
+        db: AsyncSession,
         rag_type: str,
         user_knowledge: UserKnowledge,
         question: str,
@@ -417,8 +418,8 @@ class KnowledgeService:
         Returns:
             Сгенерированный промпт
         """
-        topic = self.get_topic_title_by_topic_id(int(topic)) if topic else None
-        reply_to = self.get_username_by_user_id(int(reply_to), db=None) if reply_to else None
+        topic = await self.get_topic_title_by_topic_id(int(topic), db) if topic else None
+        reply_to = await self.get_username_by_user_id(int(reply_to), db) if reply_to else None
         logger.info(f"Creating character prompt for rag_type: {rag_type}, user_id: {user_knowledge.user_id}, topic: {topic}")
         if rag_type == "default":
             return await self._default_prompt(user_knowledge, question, context_docs, reply_to, topic)
@@ -441,11 +442,6 @@ class KnowledgeService:
                 for i, doc in enumerate(context_docs[:5])  # Берем топ-5
             ]
         )
-
-        # Формируем информацию о целевом пользователе
-        reply_context = ""
-        if reply_to:
-            reply_context = f"\n\nТы отвечаешь пользователю: {reply_to}"
 
         # Создаем промпт
         prompt = f"""Ты - {user_knowledge.name} ({user_knowledge.user_id}).
@@ -472,7 +468,7 @@ class KnowledgeService:
             {context_text if context_text.strip() else "Контекст не найден - отвечай на основе своих знаний."}
 
             # ВОПРОС:
-            {question}{reply_context}
+            {question}
 
             # ТЕМА ОБСУЖДЕНИЯ:
             {topic if topic else "Тема не указана."}

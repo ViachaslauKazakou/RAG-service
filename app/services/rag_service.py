@@ -72,6 +72,7 @@ class RAGService:
 
             # 4. Создаем промпт
             generated_prompt = await self.knowledge_service.create_character_prompt(
+                db=db,
                 rag_type=rag_type,
                 user_knowledge=user_knowledge,
                 question=request.question,
@@ -88,7 +89,7 @@ class RAGService:
             response = RAGResponse(
                 generated_prompt=generated_prompt,
                 user_id=request.user_id,
-                topic=request.topic,
+                topic=str(request.topic),
                 context_documents=[doc.model_dump() for doc in context_documents],
                 user_knowledge=user_knowledge.model_dump(),
                 confidence_score=confidence_score,

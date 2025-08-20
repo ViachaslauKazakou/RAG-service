@@ -30,8 +30,6 @@ RUN useradd --create-home --shell /bin/bash app_user
 # Копируем код приложения
 COPY app/ ./app/
 COPY forum_knowledge_base/ ./forum_knowledge_base/
-COPY alembic.ini ./
-COPY migrate.py ./
 
 # Создаем директории и устанавливаем права
 RUN mkdir -p /app/logs /tmp/hf_cache && \
